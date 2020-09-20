@@ -130,5 +130,7 @@ int main(void)
 	}
 	fclose(fp_src);
 	fclose(fp_dst);
+	free(bin);
+	free(base64);
 	return 0;
 }
