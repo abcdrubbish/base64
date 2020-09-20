@@ -3,6 +3,7 @@
 #include <string.h>
 
 char base64_table[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+char base64_decode_table[256] = {0};
 
 int base64_encode(unsigned char *bin, int len, unsigned char *base64)
 {
@@ -49,30 +50,10 @@ int base64_decode(unsigned char *base64, int len, unsigned char *bin)
 		return 0;
 	}
 	for (i = 0, k = 0; i < len; i += 4) {
-		for (j = 0; j < sizeof(base64_table); j++) {
-			if (base64_table[j] == base64[i]) {
-				tmp[0] = j;
-				break;
-			}
-		}
-		for (j = 0; j < sizeof(base64_table); j++) {
-			if (base64_table[j] == base64[i + 1]) {
-				tmp[1] = j;
-				break;
-			}
-		}
-		for (j = 0; j < sizeof(base64_table); j++) {
-			if (base64_table[j] == base64[i + 2]) {
-				tmp[2] = j;
-				break;
-			}
-		}
-		for (j = 0; j < sizeof(base64_table); j++) {
-			if (base64_table[j] == base64[i + 3]) {
-				tmp[3] = j;
-				break;
-			}
-		}
+		tmp[0] = base64_decode_table[base64[i]];
+		tmp[1] = base64_decode_table[base64[i + 1]];
+		tmp[2] = base64_decode_table[base64[i + 2]];
+		tmp[3] = base64_decode_table[base64[i + 3]];
 		bin[k++] = (tmp[0] << 2) | ((tmp[1] & 0x30) >> 4);
 		if (base64[i + 2] == '=') {
 			break;
@@ -91,9 +72,10 @@ int base64_decode(unsigned char *base64, int len, unsigned char *bin)
 int main(void)
 {
 	char src[256], dst[256];
-	unsigned char bin[1200], base64[1600];
+	unsigned char *bin, *base64;
 	FILE *fp_src, *fp_dst;
 	int bin_len, base64_len, opt;
+	int i, j;
 
 	printf("================\n");
 	printf("1. encode\n");
@@ -104,6 +86,11 @@ int main(void)
 	scanf("%s", src);
 	printf("enter dst file name: ");
 	scanf("%s", dst);
+	base64_len = strlen(base64_table);
+	memset(base64_decode_table, 0xff, sizeof(base64_decode_table));
+	for (i = 0; i < base64_len; i++) {
+		base64_decode_table[base64_table[i]] = i;
+	}
 	fp_src = fopen(src, "rb");
 	if (!fp_src) {
 		printf("[%s] open src file error\n", __FUNCTION__);
@@ -115,18 +102,31 @@ int main(void)
 		printf("[%s] open dst file error\n", __FUNCTION__);
 		return -1;
 	}
+	bin = (unsigned char *)malloc(sizeof(unsigned char) * 32 * 1024 * 1024 * 3);
+	if (!bin) {
+		fclose(fp_src);
+		fclose(fp_dst);
+		printf("[%s] malloc failed\n", __FUNCTION__);
+	}
+	base64 = (unsigned char *)malloc(sizeof(unsigned char) * 32 * 1024 * 1024 * 4);
+	if (!base64) {
+		fclose(fp_src);
+		fclose(fp_dst);
+		free(bin);
+		printf("[%s] malloc failed\n", __FUNCTION__);
+	}
 	if (opt == 1) { 
 		do {
-			bin_len = fread(bin, sizeof(char), 1200, fp_src);
+			bin_len = fread(bin, sizeof(char), 32 * 1024 * 1024 * 3, fp_src);
 			base64_len = base64_encode(bin, bin_len, base64);
 			fwrite(base64, sizeof(char), base64_len, fp_dst);
-		} while (bin_len == 1200);
+		} while (bin_len == 32 * 1024 * 1024 * 3);
 	} else if (opt == 2) {
 		do {
-			base64_len = fread(base64, sizeof(char), 1600, fp_src);
+			base64_len = fread(base64, sizeof(char), 32 * 1024 * 1024 * 4, fp_src);
 			bin_len = base64_decode(base64, base64_len, bin);
 			fwrite(bin, sizeof(char), bin_len, fp_dst);
-		} while (base64_len == 1600);
+		} while (base64_len == 32 * 1024 * 1024 * 4);
 	}
 	fclose(fp_src);
 	fclose(fp_dst);
